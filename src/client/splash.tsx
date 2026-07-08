@@ -14,15 +14,12 @@ export const Splash = () => {
         alt="Snoo"
       />
       <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">
-          Hey {context.username ?? 'user'} 👋
+        <h1 className="text-3xl font-extrabold text-center text-gray-900 dark:text-white">
+          Syntax Suika
         </h1>
-        <p className="text-base text-center text-gray-600 dark:text-gray-300">
-          Edit{' '}
-          <span className="bg-[#e5ebee] dark:bg-gray-700 px-1 py-0.5 rounded">
-            src/client/splash.tsx
-          </span>{' '}
-          to get started.
+        <p className="text-base text-center text-gray-600 dark:text-gray-300 max-w-xs px-4">
+          Drop words, merge them by grammar, and build a Complete Sentence before
+          the jar overflows{context.username ? `, ${context.username}` : ''}.
         </p>
       </div>
       <div className="flex items-center justify-center mt-5">

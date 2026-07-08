@@ -1,72 +1,111 @@
 import './index.css';
 
-import { StrictMode } from 'react';
+import Phaser from 'phaser';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { navigateTo } from '@devvit/web/client';
-import { useCounter } from './hooks/useCounter';
+
+import { createGameConfig } from './game/config';
+import { GameEvent, gameEvents } from './game/events';
+import type { SentencePop } from './game/events';
+import { KIND_CONFIG } from './game/grammar';
+import type { CapsuleSpec } from './game/grammar';
 
 export const App = () => {
-  const { count, username, loading, increment, decrement } = useCounter();
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [score, setScore] = useState(0);
+  const [queue, setQueue] = useState<CapsuleSpec[]>([]);
+  const [sentence, setSentence] = useState<SentencePop | null>(null);
+  const [finalScore, setFinalScore] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+    const game = new Phaser.Game(createGameConfig(mountRef.current));
+
+    const onScore = (value: number) => setScore(value);
+    const onQueue = (words: CapsuleSpec[]) => setQueue(words);
+    const onSentence = (pop: SentencePop) => setSentence(pop);
+    const onGameOver = (value: number) => setFinalScore(value);
+
+    gameEvents.on(GameEvent.score, onScore);
+    gameEvents.on(GameEvent.queue, onQueue);
+    gameEvents.on(GameEvent.sentence, onSentence);
+    gameEvents.on(GameEvent.gameOver, onGameOver);
+
+    return () => {
+      gameEvents.off(GameEvent.score, onScore);
+      gameEvents.off(GameEvent.queue, onQueue);
+      gameEvents.off(GameEvent.sentence, onSentence);
+      gameEvents.off(GameEvent.gameOver, onGameOver);
+      game.destroy(true);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sentence) return;
+    const timer = setTimeout(() => setSentence(null), 3500);
+    return () => clearTimeout(timer);
+  }, [sentence]);
+
+  const restart = () => {
+    setFinalScore(null);
+    setScore(0);
+    setSentence(null);
+    gameEvents.emit(GameEvent.restart);
+  };
+
   return (
-    <div className="flex relative flex-col justify-center items-center min-h-screen gap-4 bg-white dark:bg-gray-900">
-      <img
-        className="object-contain w-1/2 max-w-[250px] mx-auto"
-        src="/snoo.png"
-        alt="Snoo"
-      />
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
-          {username ? `Hey ${username} 👋` : ''}
-        </h1>
-        <p className="text-base text-center text-gray-600 dark:text-gray-300">
-          Edit{' '}
-          <span className="bg-[#e5ebee] dark:bg-gray-700 px-1 py-0.5 rounded">
-            src/client/game.tsx
-          </span>{' '}
-          to get started.
-        </p>
+    <div className="relative h-screen w-screen overflow-hidden bg-slate-900">
+      <div ref={mountRef} className="h-full w-full" />
+
+      {/* Score */}
+      <div className="absolute top-3 left-3 rounded-lg bg-slate-800/80 px-3 py-1.5 text-white">
+        <span className="text-xs uppercase tracking-wide text-slate-400">Score</span>
+        <div className="text-xl font-bold leading-tight">{score}</div>
       </div>
-      <div className="flex items-center justify-center mt-5">
-        <button
-          className="flex items-center justify-center bg-[#d93900] dark:bg-orange-600 text-white w-14 h-14 text-[2.5em] rounded-full cursor-pointer font-mono leading-none transition-colors hover:bg-[#c23300] dark:hover:bg-orange-700"
-          onClick={decrement}
-          disabled={loading}
-        >
-          -
-        </button>
-        <span className="text-[1.8em] font-medium mx-5 min-w-[50px] text-center leading-none text-gray-900 dark:text-white">
-          {loading ? '...' : count}
-        </span>
-        <button
-          className="flex items-center justify-center bg-[#d93900] dark:bg-orange-600 text-white w-14 h-14 text-[2.5em] rounded-full cursor-pointer font-mono leading-none transition-colors hover:bg-[#c23300] dark:hover:bg-orange-700"
-          onClick={increment}
-          disabled={loading}
-        >
-          +
-        </button>
+
+      {/* Next-up queue */}
+      <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+        <span className="text-xs uppercase tracking-wide text-slate-400">Next</span>
+        {queue.slice(1).map((word, i) => (
+          <div
+            key={`${word.text}-${i}`}
+            className="flex items-center gap-2 rounded-full bg-slate-800/80 px-3 py-1 text-sm font-semibold text-white"
+            style={{ opacity: 1 - i * 0.3 }}
+          >
+            <span
+              className="inline-block h-3 w-3 rounded-full"
+              style={{ backgroundColor: KIND_CONFIG[word.kind].cssColor }}
+            />
+            {word.text}
+          </div>
+        ))}
       </div>
-      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 text-[0.8em] text-gray-600 dark:text-gray-400">
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://developers.reddit.com/docs')}
-        >
-          Docs
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">|</span>
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://www.reddit.com/r/Devvit')}
-        >
-          r/Devvit
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">|</span>
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://discord.com/invite/R7yu2wh9Qz')}
-        >
-          Discord
-        </button>
-      </footer>
+
+      {/* Completed-sentence toast */}
+      {sentence && (
+        <div className="pointer-events-none absolute bottom-8 left-1/2 w-max max-w-[90%] -translate-x-1/2 rounded-xl bg-cyan-300/95 px-4 py-2 text-center shadow-lg">
+          <div className="text-sm font-bold text-slate-900">“{sentence.text}”</div>
+          <div className="text-xs font-semibold text-slate-700">
+            Complete Sentence! +{sentence.points}
+          </div>
+        </div>
+      )}
+
+      {/* Game over */}
+      {finalScore !== null && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-950/80">
+          <h1 className="text-3xl font-extrabold text-white">Game Over</h1>
+          <p className="text-slate-300">
+            Final score: <span className="text-xl font-bold text-white">{finalScore}</span>
+          </p>
+          <button
+            className="cursor-pointer rounded-full bg-[#d93900] px-6 py-2.5 font-semibold text-white transition-colors hover:bg-[#c23300]"
+            onClick={restart}
+          >
+            Play Again
+          </button>
+        </div>
+      )}
     </div>
   );
 };
